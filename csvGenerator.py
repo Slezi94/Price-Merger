@@ -1,6 +1,5 @@
 import xlwings as xw
 import pandas
-import csv
 
 ANA_ATTRIBUTE = 1
 LUA_ATTRIBUTE = [2, 3, 4, 5]
@@ -72,6 +71,7 @@ class csvGenerator:
         lua_data = pandas.DataFrame(lua_dict)
         lua_data.to_csv("Input/lua.csv")
 
+#TODO: Dorotiban is átalakítani az Ü betűket
     def do_csv(self):
         last_row = self.do_sheet.range(f"F{str(self.do_sheet.cells.last_cell.row)}").end('up').row
         self.sku_list = self.do_sheet.range(f"B2:B{last_row}").value
