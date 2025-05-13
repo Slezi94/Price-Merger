@@ -2,8 +2,40 @@ import pandas
 from csvGenerator import csvGenerator
 import datetime
 
-#def insert_rows(pandas, output_file, ana_csv, lua_csv, do_csv):
+def modify_attributes(ana_csv, lua_csv, do_csv, output):
+    # Összefűzzük az árlistákat
+    all_prices = pandas.concat([ana_csv, lua_csv, do_csv], ignore_index=True)
 
+    # Csak azok a sorok, ahol attribútum 0
+
+    zero_attr_rows = output[(output["Item.Attribute.0.Value"] == 0) & (output["PriceRule.Code"] != "ZeroPrice")]
+    print(zero_attr_rows)
+    # Új sorokat ide gyűjtjük
+    new_rows = []
+
+    for _, row in zero_attr_rows.iterrows():
+        ref = row["Item.Cleared.RefCode"]
+
+        # Mely fájlokban szerepel az adott SKU és milyen attribute értékkel?
+        matching_rows = all_prices[all_prices["sku"] == ref]
+
+        if not matching_rows.empty:
+            #print(matching_rows)
+            for _, match in matching_rows.iterrows():
+                new_row = row.copy()
+                new_row["Item.Attribute.0.Value"] = match["attribute"]
+                new_rows.append(new_row)
+    print(f"új sorok: {new_rows}")
+    new_rows = pandas.DataFrame(data=new_rows)
+    # TODO: A nem kívánt sorok törlése
+    #mask = ~((output["Item.Attribute.0.Value"] == 0) & (output["Item.Cleared.RefCode"] == new_rows["Item.Cleared.RefCode"]))
+    mask = ~((output[""]))
+    #output = output[mask]
+
+    # Új sorok hozzáadása
+    '''output = pandas.concat([output, pandas.DataFrame(new_rows)], ignore_index=True)
+    output.to_csv("Output/output.csv", index=False)'''
+    return new_rows
 
 # CSV fájlok generálása Inputból
 generator = csvGenerator()
@@ -45,41 +77,15 @@ output_file["ItemPrice"] = None
 
 #TODO:A 0-ás attribute-ok nál felvenni ugyan azokat a sorokat, megváltoztatni az attribútumát és felvenni az árát
 
-
-#insert_rows(pandas, output_file, ana, lua, do)
-# Összefűzzük az árlistákat
-all_prices = pandas.concat([ana, lua, do], ignore_index=True)
-
-# Csak azok a sorok, ahol attribútum 0
-
-zero_attr_rows = output_file[output_file["Item.Attribute.0.Value"] == 0]
-
-# Új sorokat ide gyűjtjük
-new_rows = []
-
-for _, row in zero_attr_rows.iterrows():
-    ref = row["Item.Cleared.RefCode"]
-
-    # Mely fájlokban szerepel az adott SKU és milyen attribute értékkel?
-    matching_rows = all_prices[all_prices["sku"] == ref]
-
-    if not matching_rows.empty:
-        print(matching_rows)
-        for _, match in matching_rows.iterrows():
-            new_row = row.copy()
-            new_row["Item.Attribute.0.Value"] = match["attribute"]
-            new_rows.append(new_row)
-
-# Töröljük a 0 attribútumos sorokat
+#output_file = modify_attributes(ana, lua, do, output_file)
+zero_attr_df = modify_attributes(ana, lua, do, output_file)
+print(f"zéró attribútumok: {zero_attr_df}")
 mask = ~((output_file["Item.Attribute.0.Value"] == 0) & (output_file["PriceRule.Code"] != "ZeroPrice"))
-
 output_file = output_file[mask]
+print(output_file)
+#Összeillesztés
 
-# Új sorok hozzáadása
-output_file = pandas.concat([output_file, pandas.DataFrame(new_rows)], ignore_index=True)
-output_file.to_csv("Output/output.csv", index=False)
-#print("sd")
-
+output_file = pandas.concat([zero_attr_df, output_file], join="inner")
 #Anna árak hozzáfűzése az IS7 csv fájlhoz
 ana_merge = output_file.merge(
     ana,
@@ -117,6 +123,12 @@ output_file["ItemPrice"] = output_file["ItemPrice"].fillna(0)
 output_file["ItemPrice"] = output_file["ItemPrice"].astype(int)
 
 #TODO: Segéd oszlopot törölni
+'''mask = ~((output_file["Item.Attribute.0.Value"] == 0) & (output_file["PriceRule.Code"] != "ZeroPrice")
+         & (output_file.drop(columns=["Item.Cleared.RefCode"]))
+         
+output_file = output_file[mask]'''
+
+output_file = output_file.drop(columns=["Item.Cleared.RefCode"])
 
 # CSV mentése
 output_file.to_csv("Output/output.csv", index=False)
