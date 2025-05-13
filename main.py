@@ -82,8 +82,8 @@ output_file["ItemPrice"] = None
 
 zero_attr_df = modify_attributes(ana, lua, do, output_file)
 #print(f"zéró attribútumok: {zero_attr_df}")
-#mask = ~output_file["Item.Cleared.RefCode"].isin(zero_attr_df["Item.Cleared.RefCode"])
-#output_file = output_file[mask]
+mask = ~output_file["Item.Cleared.RefCode"].isin(zero_attr_df["Item.Cleared.RefCode"])
+output_file = output_file[mask]
 print(output_file)
 #Összeillesztés
 
@@ -97,7 +97,7 @@ ana_merge = output_file.merge(
     how="left"
 )
 
-output_file["ItemPrice"] = output_file["ItemPrice"].fillna(ana_merge["price"])
+output_file["ItemPrice"] = ana_merge["price"]
 
 #Antónia Laura Zille árak hozzáfűzése az IS7 csv fájlhoz
 lua_merge = output_file.merge(
