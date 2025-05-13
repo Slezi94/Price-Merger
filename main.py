@@ -52,15 +52,13 @@ output_file["Item.Attribute.0.Value"] = output_file["Item.Attribute.0.Value"].fi
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 output_file.to_csv(f"Backup/output_backup_{timestamp}.csv", index=False)
 
+
+#TODO: Függvénybe tenni
+
 # Nyitási irány eltüntetése
 formatted_refCode = []
 
 for row in refCode:
-    '''if isinstance(row, str):
-        for suffix in ["_J", "_B", "_K"]:
-            if suffix in row:
-                row = row[:row.rfind(suffix)]
-                break'''
     if isinstance(row, str):
         for suffix in ["_J", "_B", "_K"]:
             if (row == "AAFE60") or (row == "EFT50_68"):
@@ -84,6 +82,8 @@ output_file = output_file[mask]
 #Összeillesztés
 
 output_file = pandas.concat([zero_attr_df, output_file], join="inner", ignore_index=True)
+
+#TODO: Függvénybe tenni
 
 #Anna árak hozzáfűzése az IS7 csv fájlhoz
 ana_merge = output_file.merge(
@@ -122,7 +122,7 @@ output_file["ItemPrice"] = output_file["ItemPrice"].fillna(0)
 output_file["ItemPrice"] = output_file["ItemPrice"].astype(int)
 
 # Item.Cleared.RefCode oszlopot törölni
-#output_file = output_file.drop(columns=["Item.Cleared.RefCode"])
+output_file = output_file.drop(columns=["Item.Cleared.RefCode"])
 
 # CSV mentése
 output_file.to_csv("Output/output.csv", index=False)
