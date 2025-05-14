@@ -2,6 +2,28 @@ import pandas
 from csvGenerator import csvGenerator
 import datetime
 
+# CSV fájlok generálása Inputból
+generator = csvGenerator()
+generator.ana_csv()
+generator.lau_csv()
+generator.do_csv()
+
+# Input mappa
+ana = pandas.read_csv("Input/ana.csv")
+lua = pandas.read_csv("Input/lua.csv")
+do = pandas.read_csv("Input/do.csv")
+
+# Output mappa
+output_file = pandas.read_csv("Output/output.csv")
+refCode = output_file["Item.RefCode"].to_list()
+output_file["Item.Attribute.0.Value"] = output_file["Item.Attribute.0.Value"].fillna(0).astype(int)
+
+
+# Backup output fájl
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+output_file.to_csv(f"Backup/output_backup_{timestamp}.csv", index=False)
+
+# Attribútumok módosítása a nulla attribútomok esetében
 def modify_attributes(ana_csv, lua_csv, do_csv, output):
     # Összefűzzük az árlistákat
     all_prices = pandas.concat([ana_csv, lua_csv, do_csv], ignore_index=True)
@@ -31,51 +53,69 @@ def modify_attributes(ana_csv, lua_csv, do_csv, output):
 
     return zero_attr_rows
 
-# CSV fájlok generálása Inputból
-generator = csvGenerator()
-generator.ana_csv()
-generator.lau_csv()
-generator.do_csv()
+# Stringek egységesítése
 
-# Input mappa
-ana = pandas.read_csv("Input/ana.csv")
-lua = pandas.read_csv("Input/lua.csv")
-do = pandas.read_csv("Input/do.csv")
+def change_str(codes, output):
+    # Nyitási irány eltüntetése
+    formatted_refCodes = []
 
-# Output mappa
-output_file = pandas.read_csv("Output/output.csv")
-refCode = output_file["Item.RefCode"].to_list()
-output_file["Item.Attribute.0.Value"] = output_file["Item.Attribute.0.Value"].fillna(0).astype(int)
+    for row in codes:
+        if isinstance(row, str):
+            for suffix in ["_J", "_B", "_K"]:
+                if (row == "AAFE60") or (row == "EFT50_68"):
+                    row.strip(suffix)
+                    row = row+"E"
+                elif suffix in row:
+                    row = row[:row.rfind(suffix)]
 
+        formatted_refCodes.append(row)
 
-# Backup output fájl
-timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-output_file.to_csv(f"Backup/output_backup_{timestamp}.csv", index=False)
+    # Segéd oszlop létrehozása
+    output["Item.Cleared.RefCode"] = formatted_refCodes
+    output.to_csv("Output/output.csv", index=False)
+    return output
 
+# Árak beszúrása az output_fileba
 
-#TODO: Függvénybe tenni
+def set_price(ana_csv, lua_csv, do_csv, output):
+    # Anna árak hozzáfűzése az IS7 csv fájlhoz
+    ana_merge = output.merge(
+        ana_csv,
+        left_on=["Item.Cleared.RefCode", "Item.Attribute.0.Value"],
+        right_on=["sku", "attribute"],
+        how="left"
+    )
 
-# Nyitási irány eltüntetése
-formatted_refCode = []
+    output_file["ItemPrice"] = ana_merge["price"]
 
-for row in refCode:
-    if isinstance(row, str):
-        for suffix in ["_J", "_B", "_K"]:
-            if (row == "AAFE60") or (row == "EFT50_68"):
-                row.strip(suffix)
-                row = row+"E"
-            elif suffix in row:
-                row = row[:row.rfind(suffix)]
+    # Antónia Laura Zille árak hozzáfűzése az IS7 csv fájlhoz
+    lua_merge = output.merge(
+        lua_csv,
+        left_on=["Item.Cleared.RefCode", "Item.Attribute.0.Value"],
+        right_on=["sku", "attribute"],
+        how="left"
+    )
 
-    formatted_refCode.append(row)
+    output_file["ItemPrice"] = output_file["ItemPrice"].fillna(lua_merge["price"])
 
-# Segéd oszlop létrehozása
-output_file["Item.Cleared.RefCode"] = formatted_refCode
-output_file.to_csv("Output/output.csv", index=False)
+    # Doroti árak hozzáfűzése az IS7 csv fájlhoz
+    do_merge = output.merge(
+        do_csv,
+        left_on=["Item.Cleared.RefCode", "Item.Attribute.0.Value"],
+        right_on=["sku", "attribute"],
+        how="left"
+    )
+
+    output_file["ItemPrice"] = output_file["ItemPrice"].fillna(do_merge["price"])
+    return output_file
+
+# Árak None-ra állítása
 
 output_file["ItemPrice"] = None
-
+formatted_code = change_str(refCode, output_file)
 zero_attr_df = modify_attributes(ana, lua, do, output_file)
+
+# Azoknak a soroknak a törlése, amiknek az attribútumát megváltoztattuk
 mask = ~output_file["Item.Cleared.RefCode"].isin(zero_attr_df["Item.Cleared.RefCode"])
 output_file = output_file[mask]
 
@@ -83,37 +123,7 @@ output_file = output_file[mask]
 
 output_file = pandas.concat([zero_attr_df, output_file], join="inner", ignore_index=True)
 
-#TODO: Függvénybe tenni
-
-#Anna árak hozzáfűzése az IS7 csv fájlhoz
-ana_merge = output_file.merge(
-    ana,
-    left_on=["Item.Cleared.RefCode", "Item.Attribute.0.Value"],
-    right_on=["sku", "attribute"],
-    how="left"
-)
-
-output_file["ItemPrice"] = ana_merge["price"]
-
-#Antónia Laura Zille árak hozzáfűzése az IS7 csv fájlhoz
-lua_merge = output_file.merge(
-    lua,
-    left_on=["Item.Cleared.RefCode", "Item.Attribute.0.Value"],
-    right_on=["sku", "attribute"],
-    how="left"
-)
-
-output_file["ItemPrice"] = output_file["ItemPrice"].fillna(lua_merge["price"])
-
-#Doroti árak hozzáfűzése az IS7 csv fájlhoz
-do_merge = output_file.merge(
-    do,
-    left_on=["Item.Cleared.RefCode", "Item.Attribute.0.Value"],
-    right_on=["sku", "attribute"],
-    how="left"
-)
-
-output_file["ItemPrice"] = output_file["ItemPrice"].fillna(do_merge["price"])
+item_price = set_price(ana, lua, do, output_file)
 
 # Töltsük ki a hiányzó árakat nullával
 output_file["ItemPrice"] = output_file["ItemPrice"].fillna(0)
